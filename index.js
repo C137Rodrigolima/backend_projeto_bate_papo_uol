@@ -76,6 +76,7 @@ server.post("/messages", async (req,res)=>{
         type: joi.string().valid("message", "private_message").required()
     });
     const userSchema = joi.string().required();
+
     const messageValidation = messageSchema.validate(message, { abortEarly: false });
     const userValidation = userSchema.validate(user, { abortEarly: false });
     if (messageValidation.error) {
@@ -84,7 +85,7 @@ server.post("/messages", async (req,res)=>{
         return;
     } else if (userValidation.error) {
         console.log(userValidation.error.details);
-        res.sendStatus(422);
+        res.sendStatus(422);const user = req.headers.user;
         return;
     }
 
@@ -105,12 +106,20 @@ server.post("/messages", async (req,res)=>{
 });
 
 server.get("/messages", async (req,res)=>{
+    const user = req.headers.user;
     const limit = parseInt(req.query.limit);
     try {
-        const allMessages = await db.collection('messages').find({}).toArray();
+        const allMessages = await db.collection('messages').find({$or: [
+            { to: "Todos" },
+            {$and: [{to: user}, {type: "private_message"}]},
+            {$and: [{from: user}, {type: "private_message"}]}]}
+        ).toArray();
 
         if(allMessages.length > limit){
-            const newLengthMensages = allMessages.slice(allMessages.length-1-limit, allMessages.length)
+            const newLengthMensages = allMessages.slice(
+                allMessages.length-1-limit,
+                allMessages.length
+            );
             res.send(newLengthMensages);
             return;
         }
