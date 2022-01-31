@@ -19,7 +19,6 @@ server.use(json());
 
 server.post("/participants", async (req,res)=>{
     const participant = req.body;
-    console.log(participant);
 
     const participantSchema = joi.object({
         name: joi.string().required()
@@ -70,7 +69,6 @@ server.get("/participants", async (req,res)=>{
 server.post("/messages", async (req,res)=>{
     const message = req.body;
     const user = req.headers.user;
-    console.log(message, user);
 
     const messageSchema = joi.object({
         to: joi.string().required(),
@@ -107,22 +105,35 @@ server.post("/messages", async (req,res)=>{
 });
 
 server.get("/messages", async (req,res)=>{
-    //const limit = parseInt(req.query.limit);
+    const limit = parseInt(req.query.limit);
     try {
         const allMessages = await db.collection('messages').find({}).toArray();
-        console.log(allMessages);
-        res.send(allMessages);
 
+        if(allMessages.length > limit){
+            const newLengthMensages = allMessages.slice(allMessages.length-1-limit, allMessages.length)
+            res.send(newLengthMensages);
+            return;
+        }
+        res.send(allMessages);
     } catch (error) {
         console.log(error);
         res.sendStatus(500);
     }
 });
 
-server.post("/status", (req,res)=>{
-    
+server.post("/status", async (req,res)=>{
+    const user = req.headers.user;
+    const activeParticipant = await db.collection("participants").find({name: user}).toArray();
+    if(!activeParticipant){
+        res.sendStatus(404);
+        return;
+    }
     try {
-        console.log("Post de Status em funcionamento...");
+        const updateParticipant = await db.collection("participants").updateOne(
+            { name: user},
+            {$set: 
+                {lastStatus: Date.now() }
+            });
         res.sendStatus(200);
     } catch (error) {
         console.log(error);
@@ -130,6 +141,18 @@ server.post("/status", (req,res)=>{
     }
 });
 
+setTimeout(async ()=>  {
+    const AllParticipant = await db.collection("participants").find({}).toArray();
+    AllParticipant.map( async (everyParticipant) => {
+        if(everyParticipant.lastStatus < (Date.now() - 10000)) {
+            await db.collection('messages').insertOne({
+                from: everyParticipant.name, to: 'Todos', text: 'sai da sala...', 
+                type: 'status', time: dayjs().format("HH:mm:ss")
+            });
+            await db.collection("participants").deleteOne({ _id: everyParticipant._id });
+        }
+    })
+}, 15000);
 
 server.listen(5000, ()=>{
     console.log("Server initiate on port 5000");
