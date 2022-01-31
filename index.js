@@ -67,11 +67,39 @@ server.get("/participants", async (req,res)=>{
     }
 });
 
-server.post("/messages", (req,res)=>{
-    try {
-        console.log("Post de mensagens em funcionamento...");
-        res.sendStatus(200);
-        
+server.post("/messages", async (req,res)=>{
+    const message = req.body;
+    const user = req.headers.user;
+    console.log(message, user);
+
+    const messageSchema = joi.object({
+        to: joi.string().required(),
+        text: joi.string().required(),
+        type: joi.string().valid("message", "private_message").required()
+    });
+    const userSchema = joi.string().required();
+    const messageValidation = messageSchema.validate(message, { abortEarly: false });
+    const userValidation = userSchema.validate(user, { abortEarly: false });
+    if (messageValidation.error) {
+        console.log(messageValidation.error.details);
+        res.sendStatus(422);
+        return;
+    } else if (userValidation.error) {
+        console.log(userValidation.error.details);
+        res.sendStatus(422);
+        return;
+    }
+
+    try{
+        await db.collection('messages').insertOne({
+            from: user,
+            to: message.to,
+            text: message.text,
+            type: message.type,
+            time: dayjs().format("HH:mm:ss")
+        });
+
+        res.sendStatus(201);
     } catch (error) {
         console.log(error);
         res.sendStatus(500);
