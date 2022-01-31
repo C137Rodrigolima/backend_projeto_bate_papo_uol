@@ -183,6 +183,43 @@ server.delete('/messages/:id', async (req, res) => {
     }
 });
 
+server.put('/messages/:id', async (req, res) => {
+    const message = req.body;
+    const user = req.headers.user;
+    const id = req.params.id;
+
+    const messageSchema = joi.object({
+        to: joi.string().required(),
+        text: joi.string().required(),
+        type: joi.string().valid("message", "private_message").required()
+    });
+
+    const messageValidation = messageSchema.validate(message, { abortEarly: false });
+    if (messageValidation.error) {
+        console.log(messageValidation.error.details);
+        res.sendStatus(422);
+        return;
+    }
+
+    message.time = dayjs().format("HH:mm:ss");
+
+    try {
+      const testMessage = await db.collection("messages").findOne({ _id: new ObjectId(id) })
+      if (!testMessage) {
+        res.sendStatus(404);
+        return;
+      } else if (testMessage.from !== user){
+        res.sendStatus(401);
+        return;
+    }
+  
+      await db.collection("messages").updateOne({ _id: new ObjectId(id) }, { $set: message });
+    } catch (error) {
+      console.error(error);
+      res.sendStatus(500);
+    }
+  });
+
 server.listen(5000, ()=>{
     console.log("Server initiate on port 5000");
 });
