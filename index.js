@@ -1,5 +1,5 @@
 import express, { json } from "express";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from 'mongodb';
 import cors from "cors";
 import dotenv from "dotenv";
 import joi from "joi";
@@ -152,6 +152,7 @@ server.post("/status", async (req,res)=>{
 
 setTimeout(async ()=>  {
     const AllParticipant = await db.collection("participants").find({}).toArray();
+
     AllParticipant.map( async (everyParticipant) => {
         if(everyParticipant.lastStatus < (Date.now() - 10000)) {
             await db.collection('messages').insertOne({
@@ -162,6 +163,25 @@ setTimeout(async ()=>  {
         }
     })
 }, 15000);
+
+server.delete('/messages/:id', async (req, res) => {
+    const user = req.headers.user;
+    const id = req.params.id;
+    try {
+        const message = await db.collection('messages').find({ _id: new ObjectId(id) }).toArray();
+        if(!message){
+            res.sendStatus(404);
+            return;
+        } else if (message[0].from !== user){
+            res.sendStatus(401);
+            return;
+        }
+        await db.collection('messages').deleteOne({ _id: new ObjectId(id) });
+    } catch (err) {
+        console.log(err);
+        res.sendStatus(500);
+    }
+});
 
 server.listen(5000, ()=>{
     console.log("Server initiate on port 5000");
