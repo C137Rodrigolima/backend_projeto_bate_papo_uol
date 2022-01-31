@@ -106,9 +106,12 @@ server.post("/messages", async (req,res)=>{
     }
 });
 
-server.get("/messages", (req,res)=>{
-    try {nsole.log("Get de mensagens em funcionamento...");
-    res.sendStatus(200);
+server.get("/messages", async (req,res)=>{
+    //const limit = parseInt(req.query.limit);
+    try {
+        const allMessages = await db.collection('messages').find({}).toArray();
+        console.log(allMessages);
+        res.send(allMessages);
 
     } catch (error) {
         console.log(error);
